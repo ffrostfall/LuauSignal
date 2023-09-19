@@ -1,0 +1,14 @@
+title = "LuauSignal"
+gitRepoUrl = "https://github.com/ffrostflame/luausignal/"
+
+changelog = true
+
+[docusaurus]
+projectName = "LuauSignal"
+tagline = "Blazing fast & opinionated networking library designed to reduce bandwidth"
+
+[footer]
+style = "dark"
+
+[home]
+enabled = false
