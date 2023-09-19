@@ -51,7 +51,7 @@ local classMetatable = {
 function luauSignalInterface:Connect(callback)
 	assert(typeof(callback) == "function", "[LuauSignal] callback is not a function")
 	assert(self[callback] ~= nil, "[LuauSignal] callback already exists")
-	self[callback] = callback
+	self[callback] = true
 
 	return function()
 		self[callback] = nil
@@ -76,7 +76,7 @@ end
 	```
 ]=]
 function luauSignalInterface:Fire(...)
-	for _, callback in self do
+	for callback in self do
 		if freeThread == nil then
 			freeThread = coroutine.create(yielder)
 			coroutine.resume(freeThread :: thread)
