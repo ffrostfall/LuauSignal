@@ -95,6 +95,7 @@ type Signal<T...> = {
 	Fire: (T...) -> (),
 	Connect: (callback: (T...) -> ()) -> () -> (),
 	Once: (callback: (T...) -> ()) -> () -> (),
+	DisconnectAll: () -> (),
 }
 
 type constructor = <T...>() -> Signal<T...>
