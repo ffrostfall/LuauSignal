@@ -1,177 +1,106 @@
---!strict
-local typings = require(script.typings)
-
 local freeThread: thread?
 
-local function passer(fn: (...unknown) -> (), ...): ()
-	local acquiredThread = freeThread
+local function functionPasser(fn, ...)
+	local aquiredThread = freeThread
 	freeThread = nil
 	fn(...)
-	freeThread = acquiredThread
+	freeThread = aquiredThread
 end
 
-local function yielder(): ()
+local function yielder()
 	while true do
-		passer(coroutine.yield())
+		functionPasser(coroutine.yield())
 	end
 end
 
---[=[
-	@class Signal
-]=]
-local luauSignalInterface = {}
-
-local classMetatable = {
-	__index = luauSignalInterface,
-	__tostring = function()
-		return "LuauSignal"
-	end,
+type node = {
+	_callback: () -> (),
+	_nextNode: node?,
 }
 
---[=[
-	@method Connect
-	@within Signal
-	
-	Connects a given function to the signal
-	```lua
-	local signal = LuauSignal.new()
-	
-	local connection = signal:Connect(function()
-		print("hi!")
-	end)
-	
-	signal:Fire()
-	
-	connection() -- Call the connection to clean it up, to prevent memory leaks
-	
-	@param callback function
-	@return function
-	```
-]=]
-function luauSignalInterface:Connect(callback)
-	assert(typeof(callback) == "function", "[LuauSignal] callback is not a function")
-	assert(self[callback] ~= nil, "[LuauSignal] callback already exists")
-	self[callback] = true
+local luauSignalPrototype = {}
+local prototypeMetatable = { __index = luauSignalPrototype }
+export type luauSignalType = typeof(setmetatable({} :: {
+	_rootNode: node?,
+}, prototypeMetatable))
 
-	return function()
-		self[callback] = nil
-	end
+local function constructor(): luauSignalType
+	return setmetatable({}, prototypeMetatable)
 end
 
---[=[
-	@method Fire
-	@within Signal
-	
-	Fires a signal, calling all of the connected callbacks.
-	```lua
-	local signal = LuauSignal.new()
-	
-	connection = signal:Connect(function(...)
-		print(...)
-	end)
-	
-	signal:Fire("wow", 3, false) -- will print "wow", 3, false
-	
-	@param arguments ...
-	```
-]=]
-function luauSignalInterface:Fire(...)
-	for callback in self do
+function luauSignalPrototype.Fire(self: luauSignalType, ...)
+	local node = self._rootNode
+
+	while node do
 		if freeThread == nil then
 			freeThread = coroutine.create(yielder)
 			coroutine.resume(freeThread :: thread)
 		end
 
-		task.spawn(freeThread :: thread, callback, ...)
+		task.spawn(freeThread :: thread, node._callback, ...)
+
+		node = node._nextNode
 	end
 end
 
---[=[
-	@method Once
-	@within Signal
-	
-	Connects to a signal and runs only once.
-	```lua
-	local signal = LuauSignal.new()
-	
-	signal:Once(function()
-		print("This will only print once")
-	end)
-	
-	signal:Fire()
-	signal:Fire()
-	
-	@param callback function
-	@return function
-	```
-]=]
-function luauSignalInterface:Once(callback)
-	assert(typeof(callback) == "function", "[LuauSignal] callback is not a function")
+function luauSignalPrototype.Once(self: luauSignalType, callback: () -> ())
 	local connection
+	local done = false
 
 	connection = self:Connect(function(...)
-		connection()
+		if done then
+			return
+		end
+
 		callback(...)
+
+		done = true
+		connection()
 	end)
 
 	return connection
 end
 
---[=[
-	@method Wait
-	@within Signal
-	
-	Yields until the signal is fired. Returns all arguments in the form of a vararg
-	```lua
-	local signal = LuauSignal.new()
-	
-	task.delay(1, function()
-		signal:Fire("exactly one second!")
-	end)
-	
-	local text = signal:Wait()
-	print("this was " .. text) -- prints "this was exactly one second!"
-	
-	@return ...
-	```
-]=]
-function luauSignalInterface:Wait()
-	local runningThread = coroutine.running()
+function luauSignalPrototype.Connect(self: luauSignalType, callback: () -> ())
+	local nodeRef = {
+		_nextNode = self._rootNode,
+		_callback = callback,
+	}
 
-	self:Once(function(...)
-		task.spawn(runningThread, ...)
-	end)
+	self._rootNode = nodeRef
 
-	return coroutine.yield()
+	return function()
+		if self._rootNode == nodeRef then
+			self._rootNode = nodeRef._nextNode
+		else
+			local node = self._rootNode
+
+			while node do
+				if node._nextNode == nodeRef then
+					node._nextNode = nodeRef._nextNode
+					break
+				end
+
+				node = node._nextNode
+			end
+		end
+	end
 end
 
---[=[
-	@method DisconnectAll
-	@within Signal
-	
-	Disconnects all active connections from a signal
-	```lua
-	local signal = LuauSignal.new()
-	
-	connection = signal:Connect(function()
-		print("This will never run!")
-	end)
-	
-	signal:DisconnectAll()
-	
-	signal:Fire()
-	```
-]=]
-function luauSignalInterface:DisconnectAll()
-	table.clear(self)
+function luauSignalPrototype.DisconnectAll(self: luauSignalType)
+	self._rootNode = nil
 end
 
-export type Signal<T...> = typings.Signal<T...>
+type Signal<T...> = {
+	Fire: (T...) -> (),
+	Connect: (callback: (T...) -> ()) -> () -> (),
+	Once: (callback: (T...) -> ()) -> () -> (),
+}
 
-return (
-	table.freeze({
-		new = function()
-			return setmetatable({}, classMetatable)
-		end,
-	}) :: any
-) :: typings.LuauSignalInterface
+type constructor = <T...>() -> Signal<T...>
+
+return (table.freeze({
+	new = constructor,
+}) :: any) :: {
+	new: constructor,
+}
