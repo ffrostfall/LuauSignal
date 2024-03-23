@@ -95,10 +95,10 @@ function luauSignalPrototype.DisconnectAll(self: luauSignalType)
 end
 
 export type luauSignal<T...> = {
-	Fire: (T...) -> (),
-	Connect: (callback: (T...) -> ()) -> () -> (),
-	Once: (callback: (T...) -> ()) -> () -> (),
-	DisconnectAll: () -> (),
+	Fire: (self: luauSignal<T...>, T...) -> (),
+	Connect: (self: luauSignal<T...>, callback: (T...) -> ()) -> () -> (),
+	Once: (self: luauSignal<T...>, callback: (T...) -> ()) -> () -> (),
+	DisconnectAll: (self: luauSignal<T...>) -> (),
 }
 
 type constructor = <T...>() -> luauSignal<T...>
