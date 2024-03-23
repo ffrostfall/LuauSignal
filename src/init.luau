@@ -101,10 +101,8 @@ export type luauSignal<T...> = {
 	DisconnectAll: (self: luauSignal<T...>) -> (),
 }
 
-type constructor = <T...>() -> luauSignal<T...>
-
-return (table.freeze({
+local thisType = (table.freeze({
 	new = constructor,
 }) :: any) :: {
-	new: constructor,
+	new: <T...>() -> luauSignal<T...>,
 }
