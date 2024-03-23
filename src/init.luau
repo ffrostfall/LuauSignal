@@ -20,9 +20,12 @@ type node = {
 
 local luauSignalPrototype = {}
 local prototypeMetatable = { __index = luauSignalPrototype }
-export type luauSignalType = typeof(setmetatable({} :: {
-	_rootNode: node?,
-}, prototypeMetatable))
+type luauSignalType = typeof(setmetatable(
+	{} :: {
+		_rootNode: node?,
+	},
+	prototypeMetatable
+))
 
 local function constructor(): luauSignalType
 	return setmetatable({}, prototypeMetatable)
@@ -91,14 +94,14 @@ function luauSignalPrototype.DisconnectAll(self: luauSignalType)
 	self._rootNode = nil
 end
 
-type Signal<T...> = {
+export type luauSignal<T...> = {
 	Fire: (T...) -> (),
 	Connect: (callback: (T...) -> ()) -> () -> (),
 	Once: (callback: (T...) -> ()) -> () -> (),
 	DisconnectAll: () -> (),
 }
 
-type constructor = <T...>() -> Signal<T...>
+type constructor = <T...>() -> luauSignal<T...>
 
 return (table.freeze({
 	new = constructor,
