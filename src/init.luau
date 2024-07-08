@@ -1,6 +1,6 @@
 local freeThread: thread?
 
-local function functionPasser(fn, ...)
+local function functionPasser<T...>(fn: (T...) -> (), ...: T...)
 	local aquiredThread = freeThread
 	freeThread = nil
 	fn(...)
@@ -19,19 +19,19 @@ type node = {
 }
 
 local luauSignalPrototype = {}
-local prototypeMetatable = { __index = luauSignalPrototype }
-type luauSignalType = typeof(setmetatable(
+local metatable = { __index = luauSignalPrototype }
+type LuauSignalType = typeof(setmetatable(
 	{} :: {
 		_rootNode: node?,
 	},
-	prototypeMetatable
+	metatable
 ))
 
-local function constructor(): luauSignalType
-	return setmetatable({}, prototypeMetatable)
+local function constructor(): LuauSignalType
+	return setmetatable({}, metatable)
 end
 
-function luauSignalPrototype.Fire(self: luauSignalType, ...)
+function luauSignalPrototype.fire(self: LuauSignalType, ...)
 	local node = self._rootNode
 
 	while node do
@@ -46,11 +46,11 @@ function luauSignalPrototype.Fire(self: luauSignalType, ...)
 	end
 end
 
-function luauSignalPrototype.Once(self: luauSignalType, callback: () -> ())
+function luauSignalPrototype.once(self: LuauSignalType, callback: () -> ())
 	local connection
 	local done = false
 
-	connection = self:Connect(function(...)
+	connection = self:connect(function(...)
 		if done then
 			return
 		end
@@ -64,7 +64,7 @@ function luauSignalPrototype.Once(self: luauSignalType, callback: () -> ())
 	return connection
 end
 
-function luauSignalPrototype.Connect(self: luauSignalType, callback: () -> ())
+function luauSignalPrototype.connect(self: LuauSignalType, callback: () -> ())
 	local nodeRef = {
 		_nextNode = self._rootNode,
 		_callback = callback,
@@ -90,19 +90,19 @@ function luauSignalPrototype.Connect(self: luauSignalType, callback: () -> ())
 	end
 end
 
-function luauSignalPrototype.DisconnectAll(self: luauSignalType)
+function luauSignalPrototype.disconnectAll(self: LuauSignalType)
 	self._rootNode = nil
 end
 
-export type luauSignal<T...> = {
-	Fire: (self: luauSignal<T...>, T...) -> (),
-	Connect: (self: luauSignal<T...>, callback: (T...) -> ()) -> () -> (),
-	Once: (self: luauSignal<T...>, callback: (T...) -> ()) -> () -> (),
-	DisconnectAll: (self: luauSignal<T...>) -> (),
+export type Identity<T...> = {
+	Fire: (self: Identity<T...>, T...) -> (),
+	Connect: (self: Identity<T...>, callback: (T...) -> ()) -> () -> (),
+	Once: (self: Identity<T...>, callback: (T...) -> ()) -> () -> (),
+	DisconnectAll: (self: Identity<T...>) -> (),
 }
 
-local thisType = (table.freeze({
+return (table.freeze({
 	new = constructor,
 }) :: any) :: {
-	new: <T...>() -> luauSignal<T...>,
+	new: <T...>() -> Identity<T...>,
 }
