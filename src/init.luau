@@ -1,108 +1,75 @@
+local task = task or require("@lune/task")
+
 local freeThread: thread?
 
-local function functionPasser<T...>(fn: (T...) -> (), ...: T...)
-	local aquiredThread = freeThread
+local function run<T...>(func: (T...) -> (), ...: T...)
+	local ref = freeThread
 	freeThread = nil
-	fn(...)
-	freeThread = aquiredThread
+
+	func(...)
+
+	-- Luau type solver error, uninhabited type
+	freeThread = ref :: thread?
 end
 
-local function yielder()
+local function yieldLoop()
 	while true do
-		functionPasser(coroutine.yield())
+		run(coroutine.yield())
 	end
 end
 
-type node = {
-	_callback: () -> (),
-	_nextNode: node?,
-}
-
-local luauSignalPrototype = {}
-local metatable = { __index = luauSignalPrototype }
-type LuauSignalType = typeof(setmetatable(
+local signal = {}
+export type Identity<T...> = typeof(setmetatable(
 	{} :: {
-		_rootNode: node?,
+		[number]: (T...) -> (),
 	},
-	metatable
+	{
+		-- Workaround for generics: This basically creates a unique metatable type for each signal
+		-- This is because if we use the same metatable for all signals, the generics will be shared because
+		-- well that's how metatables work.
+		__index = signal :: {
+			fire: (self: Identity<T...>, T...) -> (),
+			connect: (self: Identity<T...>, callback: (T...) -> ()) -> () -> (),
+		},
+	}
 ))
 
-local function constructor(): LuauSignalType
-	return setmetatable({}, metatable)
+local function constructor<T...>(): Identity<T...>
+	return setmetatable(
+		{} :: {
+			[number]: (T...) -> (),
+		},
+		{
+			-- See above comment
+			__index = signal :: any,
+		}
+	)
 end
 
-function luauSignalPrototype.fire(self: LuauSignalType, ...)
-	local node = self._rootNode
-
-	while node do
-		if freeThread == nil then
-			freeThread = coroutine.create(yielder)
+function signal.fire<T...>(self: Identity<T...>, ...: T...)
+	for _, callback in self do
+		if not freeThread then
+			freeThread = coroutine.create(yieldLoop)
 			coroutine.resume(freeThread :: thread)
 		end
 
-		task.spawn(freeThread :: thread, node._callback, ...)
-
-		node = node._nextNode
+		-- Type states don't take into account assigning yet
+		task.spawn(freeThread :: thread, callback, ...)
 	end
 end
 
-function luauSignalPrototype.once(self: LuauSignalType, callback: () -> ())
-	local connection
-	local done = false
-
-	connection = self:connect(function(...)
-		if done then
-			return
-		end
-
-		callback(...)
-
-		done = true
-		connection()
-	end)
-
-	return connection
-end
-
-function luauSignalPrototype.connect(self: LuauSignalType, callback: () -> ())
-	local nodeRef = {
-		_nextNode = self._rootNode,
-		_callback = callback,
-	}
-
-	self._rootNode = nodeRef
+function signal.connect<T...>(self: Identity<T...>, callback: (T...) -> ())
+	table.insert(self, callback)
+	local callbackRef = callback
 
 	return function()
-		if self._rootNode == nodeRef then
-			self._rootNode = nodeRef._nextNode
-		else
-			local node = self._rootNode
-
-			while node do
-				if node._nextNode == nodeRef then
-					node._nextNode = nodeRef._nextNode
-					break
-				end
-
-				node = node._nextNode
+		for i, v in self do
+			if v == callbackRef then
+				table.remove(self, i)
+				break
 			end
 		end
 	end
 end
 
-function luauSignalPrototype.disconnectAll(self: LuauSignalType)
-	self._rootNode = nil
-end
-
-export type Identity<T...> = {
-	Fire: (self: Identity<T...>, T...) -> (),
-	Connect: (self: Identity<T...>, callback: (T...) -> ()) -> () -> (),
-	Once: (self: Identity<T...>, callback: (T...) -> ()) -> () -> (),
-	DisconnectAll: (self: Identity<T...>) -> (),
-}
-
-return (table.freeze({
-	new = constructor,
-}) :: any) :: {
-	new: <T...>() -> Identity<T...>,
-}
+return constructor
