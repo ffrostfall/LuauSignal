@@ -19,7 +19,7 @@ local function yieldLoop()
 end
 
 local signal = {}
-export type Identity<T...> = typeof(setmetatable(
+type InternalIdentity<T...> = typeof(setmetatable(
 	{} :: {
 		[number]: (T...) -> (),
 	},
@@ -28,13 +28,13 @@ export type Identity<T...> = typeof(setmetatable(
 		-- This is because if we use the same metatable for all signals, the generics will be shared because
 		-- well that's how metatables work.
 		__index = signal :: {
-			fire: (self: Identity<T...>, T...) -> (),
-			connect: (self: Identity<T...>, callback: (T...) -> ()) -> () -> (),
+			fire: (self: InternalIdentity<T...>, T...) -> (),
+			connect: (self: InternalIdentity<T...>, callback: (T...) -> ()) -> () -> (),
 		},
 	}
 ))
 
-local function constructor<T...>(): Identity<T...>
+local function constructor<T...>(): InternalIdentity<T...>
 	return setmetatable(
 		{} :: {
 			[number]: (T...) -> (),
@@ -46,7 +46,7 @@ local function constructor<T...>(): Identity<T...>
 	)
 end
 
-function signal.fire<T...>(self: Identity<T...>, ...: T...)
+function signal.fire<T...>(self: InternalIdentity<T...>, ...: T...)
 	for _, callback in self do
 		if not freeThread then
 			freeThread = coroutine.create(yieldLoop)
@@ -58,7 +58,16 @@ function signal.fire<T...>(self: Identity<T...>, ...: T...)
 	end
 end
 
-function signal.connect<T...>(self: Identity<T...>, callback: (T...) -> ())
+function signal.once<T...>(self: InternalIdentity<T...>, callback: (T...) -> ())
+	local disconnect
+	disconnect = self:connect(function(...)
+		(disconnect :: any)()
+
+		callback(...)
+	end)
+end
+
+function signal.connect<T...>(self: InternalIdentity<T...>, callback: (T...) -> ())
 	table.insert(self, callback)
 	local callbackRef = callback
 
@@ -72,4 +81,11 @@ function signal.connect<T...>(self: Identity<T...>, callback: (T...) -> ())
 	end
 end
 
-return constructor
+export type Identity<T...> = {
+	fire: (self: Identity<T...>, T...) -> (),
+	connect: (self: Identity<T...>, callback: (T...) -> ()) -> () -> (),
+	once: (self: Identity<T...>, callback: (T...) -> ()) -> () -> (),
+	disconnectAll: (self: Identity<T...>) -> (),
+}
+
+return (constructor :: any) :: <T...>() -> Identity<T...>
