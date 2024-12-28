@@ -1,15 +1,14 @@
 local task = task or require("@lune/task")
 
-local freeThread: thread?
+local freeThread: thread? = nil
 
 local function run<T...>(func: (T...) -> (), ...: T...)
-	local ref = freeThread
+	local ref: thread? = freeThread
 	freeThread = nil
 
 	func(...)
 
-	-- Luau type solver error, uninhabited type
-	freeThread = ref :: thread?
+	freeThread = ref
 end
 
 local function yieldLoop()
@@ -30,6 +29,9 @@ type InternalIdentity<T...> = typeof(setmetatable(
 		__index = signal :: {
 			fire: (self: InternalIdentity<T...>, T...) -> (),
 			connect: (self: InternalIdentity<T...>, callback: (T...) -> ()) -> () -> (),
+			once: (self: InternalIdentity<T...>, callback: (T...) -> ()) -> () -> (),
+			wait: (self: InternalIdentity<T...>) -> T...,
+			disconnectAll: (self: InternalIdentity<T...>) -> T...,
 		},
 	}
 ))
@@ -50,7 +52,7 @@ function signal.fire<T...>(self: InternalIdentity<T...>, ...: T...)
 	for _, callback in self do
 		if not freeThread then
 			freeThread = coroutine.create(yieldLoop)
-			coroutine.resume(freeThread :: thread)
+			task.spawn(freeThread :: thread)
 		end
 
 		-- Type states don't take into account assigning yet
@@ -67,6 +69,21 @@ function signal.once<T...>(self: InternalIdentity<T...>, callback: (T...) -> ())
 	end)
 end
 
+function signal.wait<T...>(self: InternalIdentity<T...>): T...
+	local running = coroutine.running()
+
+	self:once(function(...)
+		assert(
+			coroutine.status(running) == "suspended",
+			":wait() called, then another thread resumed the waiting thread. Please dont do that :("
+		)
+
+		task.spawn(running, ...)
+	end)
+
+	return coroutine.yield()
+end
+
 function signal.connect<T...>(self: InternalIdentity<T...>, callback: (T...) -> ())
 	table.insert(self, callback)
 	local callbackRef = callback
@@ -81,10 +98,15 @@ function signal.connect<T...>(self: InternalIdentity<T...>, callback: (T...) -> 
 	end
 end
 
+function signal.disconnectAll<T...>(self: InternalIdentity<T...>)
+	table.clear(self)
+end
+
 export type Identity<T...> = {
 	fire: (self: Identity<T...>, T...) -> (),
 	connect: (self: Identity<T...>, callback: (T...) -> ()) -> () -> (),
 	once: (self: Identity<T...>, callback: (T...) -> ()) -> () -> (),
+	wait: (self: Identity<T...>) -> T...,
 	disconnectAll: (self: Identity<T...>) -> (),
 }
 

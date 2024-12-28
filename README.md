@@ -9,11 +9,11 @@ LuauSignal is a signal implementation written for modern Luau, with the added be
 ```lua
 local LuauSignal = require(path.to.LuauSignal)
 
-local tookDamage: LuauSignal.Signal<Player, number> = LuauSignal.new()
+local tookDamage: LuauSignal.Identity<Player, number> = LuauSignal()
 
-tookDamage:Connect(function(player, amount)
+tookDamage:connect(function(player, amount)
 	print(`player { player.Name } took { amount } damage!`)
 end)
 
-tookDamage:Fire(Players.theReader101, 50)
+tookDamage:fire(Players.theReader101, 50)
 ```
