@@ -57,7 +57,7 @@ case("firing calls connected functions", function(interface)
 end)
 
 case("firing passes arguments", function(interface)
-	local sig = signal() :: signal.Identity<>
+	local sig = signal() :: signal.Identity<number, number>
 
 	local called = false
 	sig:connect(function(a, b)
@@ -109,7 +109,7 @@ case("once only calls once", function(interface)
 end)
 
 case("once passes arguments", function(interface)
-	local sig = signal() :: signal.Identity<>
+	local sig = signal() :: signal.Identity<number, number>
 
 	local called = false
 	sig:once(function(a, b)
@@ -119,6 +119,58 @@ case("once passes arguments", function(interface)
 	sig:fire(1, 2)
 
 	interface.expect.truthy(called)
+end)
+
+case("cannot call methods on deleted signal", function(interface)
+	local sig = signal()
+
+	sig:fire()
+
+	sig:delete()
+
+	local success = pcall(function()
+		sig:fire()
+	end)
+
+	interface.expect.equal(success, false)
+end)
+
+case("ordering is preserved", function(interface)
+	local sig = signal()
+
+	local order = {}
+
+	sig:connect(function()
+		table.insert(order, 1)
+	end)
+
+	sig:connect(function()
+		table.insert(order, 2)
+	end)
+
+	sig:fire()
+
+	interface.expect.equal(order, { 1, 2 })
+end)
+
+case("ordering is preserved with disconnect", function(interface)
+	local sig = signal()
+
+	local order = {}
+
+	local connection1 = sig:connect(function()
+		table.insert(order, 1)
+	end)
+
+	local connection2 = sig:connect(function()
+		table.insert(order, 2)
+	end)
+
+	connection1()
+
+	sig:fire()
+
+	interface.expect.equal(order, { 2 })
 end)
 
 return eof()
