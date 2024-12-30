@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkdocs=self.webpackChunkdocs||[]).push([[991],{63891:s=>{s.exports=JSON.parse('{"sourceUrl":"https://github.com/ffrostflame/luausignal//blob/master","baseUrl":"/LuauSignal/","classOrder":[],"apiCategories":[]}')}}]);
