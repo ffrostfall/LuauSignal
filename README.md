@@ -1,5 +1,7 @@
 # luausignal
 
+[Documentation](https://ffrostfall.github.io/luausignal/docs/intro)
+
 ---
 
 luausignal is a signal implementation written for modern Luau, with modern best practices.
