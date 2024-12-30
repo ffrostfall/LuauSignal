@@ -1,0 +1,12 @@
+{
+	"name": "luausignal-benches",
+	"tree": {
+		"$className": "DataModel",
+
+		"ReplicatedStorage": {
+			"benches": {
+				"$path": "benches"
+			}
+		}
+	}
+}
