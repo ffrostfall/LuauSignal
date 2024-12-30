@@ -1,11 +1,11 @@
-title = "LuauSignal"
-gitRepoUrl = "https://github.com/ffrostflame/luausignal/"
+title = "luausignal"
+gitRepoUrl = "https://github.com/ffrostfall/luausignal/"
 
 changelog = true
 
 [docusaurus]
-projectName = "LuauSignal"
-tagline = "Blazing fast & opinionated networking library designed to reduce bandwidth"
+projectName = "luausignal"
+tagline = "Tested, fast, typed signals for Luau."
 
 [footer]
 style = "dark"

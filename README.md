@@ -1,15 +1,13 @@
-# LuauSignal
+# luausignal
 
 ---
 
-## A pure-Luau signal implementation
-
-LuauSignal is a signal implementation written for modern Luau, with the added benefit of being incredibly fast. It has an API that mirrors Roblox's `RBXScriptSignal`, with a few minor differences. The primary benefit that LuauSignal gives is it being strictly typed, with generic type arguments so you can typecheck your signals.
+luausignal is a signal implementation written for modern Luau, with modern best practices.
 
 ```lua
-local LuauSignal = require(path.to.LuauSignal)
+local signal = require(path.to.signal)
 
-local tookDamage: LuauSignal.Identity<Player, number> = LuauSignal()
+local tookDamage: signal.Identity<Player, number> = signal()
 
 tookDamage:connect(function(player, amount)
 	print(`player { player.Name } took { amount } damage!`)
@@ -17,3 +15,7 @@ end)
 
 tookDamage:fire(Players.theReader101, 50)
 ```
+
+## It's a table. Don't worry about memory leaks.
+
+luausignal is just a table, with a metatable. The connections are just functions in an array. This means that it will be garbage collected.

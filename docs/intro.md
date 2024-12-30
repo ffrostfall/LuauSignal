@@ -1,45 +1,75 @@
-# Intro
+# luausignal
 
-LuauSignal aims to be a strictly-typed Luau implementation of a signal. It does not aim to be 1:1 to `RBXScriptSignal`, because there's multiple needless features that don't need to be there (for example, an entire class for connections.)
+## Why?
 
-## Why use this over GoodSignal?
+I wanted a typechecked, small, cross-runtime & performant signal implementation which didn't use the same Roblox-based RbxScriptSignal API. None existed, so I made one.
 
-GoodSignal was not written in strict Luau, which means that it has several type errors. Alongside this, GoodSignal aims to replicate `RBXScriptSignal` almost perfectly. This, however, is limiting. It means more memory usage overall, and it means an entire class just for connections. In LuauSignal, the `Connect` method returns a function. Calling this function disconnects the connection.
+## Basic Features
 
-## Drawbacks
+- Firing and disconnecting (duh)
+- Disconnect all
+- Wait
+- Once
+- Function constructor, `signal()` over `signal.new()`
 
-The drawbacks of using LuauSignal over the alternative, GoodSignal, are:
+## Overview
 
-- Connections are not fired in order of when they were connected
-- You cannot connect the exact same callback more than once
+- Thread reusage
+- Cross-runtime (Roblox, Lune)
+- Strictly typed, with an exported "Identity" type for your type-definition needs.
+- Extremely performant implementation; literally just an array with a metatable. No linked lists here!
+- Automated testing guarantees behavior and stability
+- Error handling for niche cases
+- Battle-tested. This has been around for a while and I use it
+- Future-proof (this uses the new solver lol)
 
-## Luau Types
+## Installation
 
-The main benefit of using LuauSignal over GoodSignal is that you can type your signals using generic types.
+### Wally
 
-```lua
---!strict
-local signal = LuauSignal.new()
+You can find luausignal under `ffrostfall/luausignal@<latest version>`.
 
-signal:Connect(function()
-	print("I don't do anything!")
-end)
+### Literally just copy pasting
 
-signal:Fire(5, 4, 3) -- This will lint, saying there are more arguments than expected.
-```
+You can also just literally copy paste this. It's one file.
 
-```lua
---!strict
-local signal: LuauSignal.Signal<string> = LuauSignal.new()
+## Benchmarks (why not ig)
 
-signal:Connect(function(text) -- This is typechecked as a string
-	print(text)
-end)
+specs:
 
-signal:Fire("some random text") -- This doesn't lint!
-```
+- 64gb 3600mz RAM
+- i79700kf @ ~4.00 GHz (overclocked)
+  - 8 cores
+  - 512kb L1 cache
 
-### Incorrect number of arguments to .new()
+Numbers are done by the 50th percentile.
+| Test | luausignal (μs) | goodsignal (μs) |
+| ---- | ---------- | ---------- |
+| Firing (5 connections) | 2.178 | 2.124 |
+| Firing (0 connections) | 0.038 | 0.026 |
+| Connecting | 0.104 | 0.212 |
+| Disconnecting | 0.172 | 2.554 |
+| Constructing | 0.066 | 0.102 |
 
-If your linter says "incorrect number of arguments to .new()", you can solve it by simply putting "..." in the `.new()` function like so:
-`local signal: LuauSignal.Signal<string> = LuauSignal.new(...)`
+### Firing (5 connections) analysis
+
+Both luausignal and goodsignal use the same thread reuse method, and are doing nearly the exact same operations.
+However, arrays are slightly cheaper than linked lists at the end of the day.
+
+### Firing (0 connections) analysis
+
+Again, nearly identical except for a handful of CPU cycles.
+
+Goodsignal wins due to it's usage of linked lists. Iterating over a zero-length array is slower than iterating over a zero-length linked list.
+
+### Connecting analysis
+
+Luausignal wins by a decent margin here because inserting into an array is substantially faster than inserting into a linked list.
+
+### Disconnecting analysis
+
+Luausignal wins by an **incredibly** large margin here. This is because, again, arrays are faster than linked lists! table.find and table.remove
+
+### Constructor analysis
+
+Luausignal wins here for obvious reasons: constructing an array with a metatable is faster than a dictionary.
